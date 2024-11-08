@@ -4,7 +4,7 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Henry", "Holm", , "hholm@ldeo.columbia.edu", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: An R package of functions used for data formating and analysis in the LDEO MEB lab. https://hurley.ldeo.columbia.edu/
+Description: An R package of functions used for data processing in the LDEO MEB lab. https://hurley.ldeo.columbia.edu/
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
