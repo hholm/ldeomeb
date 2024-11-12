@@ -2,13 +2,16 @@
 % Please edit documentation in R/functions.R
 \name{tidyplate}
 \alias{tidyplate}
-\title{Nicely formats plate reader data.}
+\title{Import and format plate reader data from TECAN i-control.}
 \usage{
-tidyplate(dat)
+tidyplate(loc)
 }
 \arguments{
-\item{A}{location of raw plate reader data.}
+\item{loc}{A \link{character} string containing the file location of raw plate reader data to import.}
+}
+\value{
+A \link{data.frame} containing imported and formatted data.
 }
 \description{
-Nicely formats plate reader data.
+This function returns a data.frame containing formatted data from a from TECAN i-control csv output.
 }
