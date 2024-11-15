@@ -19,7 +19,6 @@ A \link{data.frame} containing calculated pH values with metadata.
 This function returns a data.frame containing calculated pH values and metadata.
 }
 \details{
-#' @details text describing parameter inputs in more detail.
 \itemize{
 \item tidyplate A \link{data.frame} containing formatted absorbance created using \code{\link[=tidyplate]{tidyplate()}}.
 \item pairs A \link{data.frame} containing paired 'blank' and 'dye' rows. Defaults too: \link{data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H"))}

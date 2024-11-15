@@ -3,3 +3,4 @@
 export(calc_pH_spec)
 export(calc_plate)
 export(tidyplate)
+importFrom(magrittr,"%>%")

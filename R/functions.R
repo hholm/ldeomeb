@@ -1,3 +1,6 @@
+#' @importFrom magrittr %>%
+NULL
+
 #' Import and format plate reader data from TECAN i-control.
 #'
 #' This function returns a data.frame containing formatted data from a from TECAN i-control csv output.
@@ -30,7 +33,7 @@ tidyplate <- function(loc) {
     plate$rows <- dat[(which(dat[, 1] == "<>")[i] + 1):(which(dat[, 1] == "<>")[i] + plate.sizes$rows[i]), 1]
 
     # add in metadata
-    plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = dat[which(dat[, 1] == label) + 1, 5]) |>
+    plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = dat[which(dat[, 1] == label) + 1, 5]) %>%
       dplyr::mutate(
         start.datetime = dat[which(dat[, 1] == label) + 7, 2],
         end.datetime = dat[which(dat[, 1] == label) + plate.sizes$rows[i] + 15, 2],
@@ -38,7 +41,7 @@ tidyplate <- function(loc) {
         bandwidth = as.numeric(dat[which(dat[, 1] == label) + 3, 5]),
         n.flash = as.numeric(dat[which(dat[, 1] == label) + 4, 5]),
         temp = as.numeric(stringr::str_extract(dat[which(dat[, 1] == label) + 9, 2], pattern = "[:digit:]..."))
-      ) |>
+      ) %>%
       rbind(plates)
   }
 
@@ -113,12 +116,23 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
 
   # add a position column
   tidyplate$position <- tidyplate$cols
+
+  out <- list()
   for (i in 1:nrow(pairs)) {
-    tidyplate[which(tidyplate$rows %in% pairs[i, ]), "position"] <- paste0(unlist(tidyplate[which(tidyplate$rows %in% pairs[i, ]), "position"]), paste0(pairs[i, ], collapse = ""))
+    out[[i]] <- tidyplate %>%
+      subset(tidyplate$rows %in% pairs[i, ]) %>%
+      dplyr::mutate(position = paste0(position,paste0(pairs[i, ], collapse = "")))
   }
+
+  tidyplate <- do.call(rbind, out)
 
   # if sample names exist, keep them, if not use only positions
   if (!is.null(tidyplate$names)) {
+    # fix if names don't match across position
+    tidyplate <- tidyplate %>%
+      dplyr::group_by(position) %>%
+      dplyr::mutate(names = list(unique(names))) %>%
+      dplyr::ungroup()
     id_cols <- c("position", "names")
   } else {
     id_cols <- "position"

@@ -23,7 +23,6 @@ A \link{data.frame} containing calculated pH values with metadata, or a \link{ve
 This function returns a data.frame containing calculated pH values.
 }
 \details{
-#' @details text describing parameter inputs in more detail.
 \itemize{
 \item A730_blank A \link{vector} or \link{numeric} of samples absorbance at 730nm with no dye.
 \item A578_blank A \link{vector} or \link{numeric} of samples absorbance at 578nm with no dye.
