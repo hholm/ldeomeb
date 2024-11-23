@@ -33,8 +33,9 @@ tidyplate <- function(loc) {
     plate$rows <- dat[(which(dat[, 1] == "<>")[i] + 1):(which(dat[, 1] == "<>")[i] + plate.sizes$rows[i]), 1]
 
     # add in metadata
-    plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = dat[which(dat[, 1] == label) + 1, 5]) %>%
+    plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = "value") %>%
       dplyr::mutate(
+        value.type = dat[which(dat[, 1] == label) + 1, 5],
         start.datetime = dat[which(dat[, 1] == label) + 7, 2],
         end.datetime = dat[which(dat[, 1] == label) + plate.sizes$rows[i] + 15, 2],
         wave.length = as.numeric(dat[which(dat[, 1] == label) + 2, 5]),
@@ -110,6 +111,8 @@ calc_pH_spec <- function(A730_blank, A578_blank, A434_blank, A730_dye, A578_dye,
 calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H")),
                        salinty = 35, vol.dye.L = 0.01) {
 
+  tidyplate %>% subset(value.type == "Absorbance")
+
   # assign well type based on 'pairs" data.frame
   tidyplate[which(tidyplate$rows %in% pairs$blanks), "type"] <- "blank"
   tidyplate[which(tidyplate$rows %in% pairs$dyes), "type"] <- "dye"
@@ -140,7 +143,7 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
 
   # reformate
   return <- tidyplate %>%
-    tidyr::pivot_wider(names_from = c(type, wave.length), values_from = Absorbance, id_cols = all_of(id_cols)) %>%
+    tidyr::pivot_wider(names_from = c(type, wave.length), values_from = value, id_cols = all_of(id_cols)) %>%
     dplyr::mutate_at(dplyr::vars("blank_730", "dye_730", "blank_578", "dye_578", "blank_434", "dye_434"), as.numeric)
 
   # calculate pH
