@@ -16,8 +16,8 @@ tidyplate <- function(loc) {
 
   # find plate sizes
   plate.sizes <- list(
-    rows = which(dat[, 1] == "End Time:") - which(dat[, 1] == "<>") - 5,
-    cols = as.vector(apply(dat[which(dat[, 1] == "<>"), ], 1, function(x) {
+    rows = which(dat[, 1] == "End Time:") - which(dat[, 1] == "Start Time:") - 8,
+    cols = as.vector(apply(dat[which(dat[, 1] == "Start Time:")+3, ], 1, function(x) {
       length(which(!is.na(suppressWarnings(as.numeric(x)))))
     }))
   )
@@ -28,12 +28,20 @@ tidyplate <- function(loc) {
     label <- labels[i]
 
     # read plate values
-    plate <- data.frame(dat[(which(dat[, 1] == "<>")[i] + 1):(which(dat[, 1] == "<>")[i] + plate.sizes$rows[i]), 2:(2 + plate.sizes$cols[i] - 1)])
-    colnames(plate) <- dat[which(dat[, 1] == "<>")[i], ][2:(2 + (plate.sizes$cols[i] - 1))]
-    plate$rows <- dat[(which(dat[, 1] == "<>")[i] + 1):(which(dat[, 1] == "<>")[i] + plate.sizes$rows[i]), 1]
+    plate <- data.frame(dat[(which(dat[, 1] == "Start Time:")[i] + 4):((which(dat[, 1] == "Start Time:")[i]+3) + plate.sizes$rows[i]), 2:(2 + plate.sizes$cols[i] - 1)])
+    colnames(plate) <- dat[(which(dat[, 1] == "Start Time:")[i]+3) , ][2:(2 + (plate.sizes$cols[i] - 1))]
+    plate$rows <- dat[((which(dat[, 1] == "Start Time:")[i]+3)  + 1):((which(dat[, 1] == "Start Time:")[i]+3)  + plate.sizes$rows[i]), 1]
 
     # add in metadata
     plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = "value") %>%
+=======
+    meta.data <- data.frame(setting = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1],
+                            val = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5])
+    
+    meta.data <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5]
+    names(meta.data) <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1]
+    
+    plates <- tidyr::pivot_longer(plate, -rows, names_to = "cols", values_to = dat[which(dat[, 1] == label) + 1, 5]) %>%
       dplyr::mutate(
         value.type = dat[which(dat[, 1] == label) + 1, 5],
         start.datetime = dat[which(dat[, 1] == label) + 7, 2],
