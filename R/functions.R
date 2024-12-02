@@ -146,7 +146,12 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
 
   # reformate
   return <- tidyplate %>%
-    tidyr::pivot_wider(names_from = c(type,`Measurement Wavelength`), values_from = value, id_cols = all_of(id_cols)) %>%
+    select(-c("position","rows","cols")) %>%
+    mutate(`Start Time` = lubridate::mdy_hm(`Start Time`)) %>%
+    mutate(`Average Start Time` = mean(`Start Time`)) %>%
+    select(-`Start Time`) %>%
+    tidyr::pivot_wider(names_from = c(type,`Measurement Wavelength`), values_from = value#, id_cols = all_of(id_cols)
+                       ) %>%
     dplyr::mutate_at(dplyr::vars("blank_730", "dye_730", "blank_578", "dye_578", "blank_434", "dye_434"), as.numeric)
 
   # calculate pH
