@@ -143,15 +143,22 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
     id_cols <- "position"
     #warning("No names column in data.frame. Using well positions as names.")
   }
+  
+  # time issues
+  if (all(stringr::str_detect(tidyplate$`Start Time`, pattern = "AM|PM"))) {
+    return <- tidyplate %>%
+      mutate(`Start Time` = lubridate::parse_date_time(`Start Time`, orders = "%m/%d/%Y %h:%M:%S %p"))
+  } else {
+    return <- tidyplate %>%
+      mutate(`Start Time` = lubridate::mdy_hm(`Start Time`))
+  }
 
-  # reformate
-  return <- tidyplate %>%
-    select(-c("position","rows","cols")) %>%
-    mutate(`Start Time` = lubridate::mdy_hm(`Start Time`)) %>%
+  # reformat
+  return <- return %>%
     mutate(`Average Start Time` = mean(`Start Time`)) %>%
     select(-`Start Time`) %>%
-    tidyr::pivot_wider(names_from = c(type,`Measurement Wavelength`), values_from = value#, id_cols = all_of(id_cols)
-                       ) %>%
+    select(-c("rows","cols")) %>%
+    tidyr::pivot_wider(names_from = c(type,`Measurement Wavelength`), values_from = value) %>%
     dplyr::mutate_at(dplyr::vars("blank_730", "dye_730", "blank_578", "dye_578", "blank_434", "dye_434"), as.numeric)
 
   # calculate pH
