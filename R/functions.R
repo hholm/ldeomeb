@@ -29,7 +29,7 @@ tidyplate <- function(loc) {
 
     # read plate values
     plate <- data.frame(dat[(which(dat[, 1] == "Start Time:")[i] + 4):((which(dat[, 1] == "Start Time:")[i]+3) + plate.sizes$rows[i]), 2:(2 + plate.sizes$cols[i] - 1)]) %>%
-      mutate(across(everything(),as.numeric))
+      dplyr::mutate(across(everything(),as.numeric))
     colnames(plate) <- dat[(which(dat[, 1] == "Start Time:")[i]+3) , ][2:(2 + (plate.sizes$cols[i] - 1))]
     plate$rows <- dat[((which(dat[, 1] == "Start Time:")[i]+3)  + 1):((which(dat[, 1] == "Start Time:")[i]+3)  + plate.sizes$rows[i]), 1]
 
@@ -40,12 +40,21 @@ tidyplate <- function(loc) {
     meta.data <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5]
     names(meta.data) <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1]
     
+    if (nrow(plates) == 0) {
+      plates <- plate %>%
+        mutate(across(-rows,as.numeric)) %>%
+        tidyr::pivot_longer(cols = -rows, names_to = "cols", values_to = "value") %>%
+        mutate(!!!meta.data) %>%
+        mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]),2]) %>%
+        rbind()
+    }else{
     plates <- plate %>%
       mutate(across(-rows,as.numeric)) %>%
       tidyr::pivot_longer(cols = -rows, names_to = "cols", values_to = "value") %>%
       mutate(!!!meta.data) %>%
       mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]),2]) %>%
-      rbind(plates)
+      dplyr::full_join(plates)
+    }
   }
 
   # add a name column if it exists
