@@ -36,7 +36,7 @@ tidyplate <- function(loc) {
     # add in metadata
     meta.data <- data.frame(setting = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1],
                             val = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5])
-    
+
     meta.data <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5]
     names(meta.data) <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1]
     
@@ -96,7 +96,8 @@ calc_pH_spec <- function(A730_blank, A578_blank, A434_blank, A730_dye, A578_dye,
   # following hennon formula
   A1_A2 <- (A578_dye - A578_blank - (A730_dye - A730_blank)) / (A434_dye - A434_blank - (A730_dye - A730_blank))
   pK2 <- (1245.9 / 298) + 3.8275 + (0.00211 * (35 - salinity))
-  A1_A2_cor <- A1_A2 + (0.0218 - (0.0359 * A1_A2)) * vol.dye.L
+  #A1_A2_cor <- A1_A2 + (0.0218 - (0.0359 * A1_A2)) * vol.dye.L
+  A1_A2_cor <- A1_A2 + (-0.00660453* vol.dye.L*1e6)
   # return all data if desired
   if (verbose) {
     return(data.frame(A1_A2, pK2, A1_A2_cor, pH = pK2 + log10((A1_A2_cor - 0.00691) / (2.222 - A1_A2_cor * 0.1331))))
@@ -152,7 +153,7 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
     id_cols <- "position"
     #warning("No names column in data.frame. Using well positions as names.")
   }
-  
+
   # time issues
   if (all(stringr::str_detect(tidyplate$`Start Time`, pattern = "AM|PM"))) {
     return <- tidyplate %>%
@@ -186,6 +187,5 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = data.frame(blanks = c(
   }
   return(return)
 }
-
 
 
