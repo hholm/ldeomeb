@@ -81,7 +81,7 @@ tidyplate <- function(dat) {
     plates[which(plates$rows %in% pairs$blanks), "type"] <- "blank"
     plates[which(plates$rows %in% pairs$dyes), "type"] <- "dye"
 
-  }
+  }else{pairs = "No pair data found in sheet."}
   return(list(plates = plates,pairs = pairs))
 }
 
