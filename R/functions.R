@@ -8,9 +8,7 @@ NULL
 #' @param loc A [character] string containing the file location of raw plate reader data to import.
 #' @return A [data.frame] containing imported and formatted data.
 #' @export
-tidyplate <- function(loc) {
-
-  dat <- read.csv(loc)
+tidyplate <- function(dat) {
 
   # find plate labels
   labels <- dat[which(stringr::str_detect(dat[, 1], "Label: ")), 1]
