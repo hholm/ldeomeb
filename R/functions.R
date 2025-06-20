@@ -9,14 +9,13 @@ NULL
 #' @return A [data.frame] containing imported and formatted data.
 #' @export
 tidyplate <- function(dat) {
-
   # find plate labels
   labels <- dat[which(stringr::str_detect(dat[, 1], "Label: ")), 1]
 
   # find plate sizes
   plate.sizes <- list(
     rows = which(dat[, 1] == "End Time:") - which(dat[, 1] == "Start Time:") - 8,
-    cols = as.vector(apply(dat[which(dat[, 1] == "Start Time:")+3, ], 1, function(x) {
+    cols = as.vector(apply(dat[which(dat[, 1] == "Start Time:") + 3, ], 1, function(x) {
       length(which(!is.na(suppressWarnings(as.numeric(x)))))
     }))
   )
@@ -27,51 +26,55 @@ tidyplate <- function(dat) {
     label <- labels[i]
 
     # read plate values
-    plate <- data.frame(dat[(which(dat[, 1] == "Start Time:")[i] + 4):((which(dat[, 1] == "Start Time:")[i]+3) + plate.sizes$rows[i]), 2:(2 + plate.sizes$cols[i] - 1)]) %>%
-      dplyr::mutate(across(everything(),as.numeric))
-    colnames(plate) <- dat[(which(dat[, 1] == "Start Time:")[i]+3) , ][2:(2 + (plate.sizes$cols[i] - 1))]
-    plate$rows <- dat[((which(dat[, 1] == "Start Time:")[i]+3)  + 1):((which(dat[, 1] == "Start Time:")[i]+3)  + plate.sizes$rows[i]), 1]
+    plate <- data.frame(dat[(which(dat[, 1] == "Start Time:")[i] + 4):((which(dat[, 1] == "Start Time:")[i] + 3) + plate.sizes$rows[i]), 2:(2 + plate.sizes$cols[i] - 1)]) %>%
+      dplyr::mutate(across(everything(), as.numeric))
+    colnames(plate) <- dat[(which(dat[, 1] == "Start Time:")[i] + 3), ][2:(2 + (plate.sizes$cols[i] - 1))]
+    plate$rows <- dat[((which(dat[, 1] == "Start Time:")[i] + 3) + 1):((which(dat[, 1] == "Start Time:")[i] + 3) + plate.sizes$rows[i]), 1]
 
     # add in metadata
-    meta.data <- data.frame(setting = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1],
-                            val = dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5])
+    meta.data <- data.frame(
+      setting = dat[(which(dat[, 1] == label) + 1):(which(dat[, 1] == "Start Time:")[i] - 1), 1],
+      val = dat[(which(dat[, 1] == label) + 1):(which(dat[, 1] == "Start Time:")[i] - 1), 5]
+    )
 
-    meta.data <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 5]
-    names(meta.data) <- dat[(which(dat[, 1] == label)+1):(which(dat[, 1] == "Start Time:")[i]-1), 1]
+    meta.data <- dat[(which(dat[, 1] == label) + 1):(which(dat[, 1] == "Start Time:")[i] - 1), 5]
+    names(meta.data) <- dat[(which(dat[, 1] == label) + 1):(which(dat[, 1] == "Start Time:")[i] - 1), 1]
 
     if (nrow(plates) == 0) {
       plates <- plate %>%
-        mutate(across(-rows,as.numeric)) %>%
+        mutate(across(-rows, as.numeric)) %>%
         tidyr::pivot_longer(cols = -rows, names_to = "cols", values_to = "value") %>%
         mutate(!!!meta.data) %>%
-        mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]),2]) %>%
+        mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]), 2]) %>%
         rbind()
-    }else{
-    plates <- plate %>%
-      mutate(across(-rows,as.numeric)) %>%
-      tidyr::pivot_longer(cols = -rows, names_to = "cols", values_to = "value") %>%
-      mutate(!!!meta.data) %>%
-      mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]),2]) %>%
-      dplyr::full_join(plates)
+    } else {
+      plates <- plate %>%
+        mutate(across(-rows, as.numeric)) %>%
+        tidyr::pivot_longer(cols = -rows, names_to = "cols", values_to = "value") %>%
+        mutate(!!!meta.data) %>%
+        mutate(`Start Time` = dat[(which(dat[, 1] == "Start Time:")[i]), 2]) %>%
+        {suppressMessages(dplyr::full_join(.,plates))}
     }
   }
 
   # add a name column if it exists
-  if (any(dat[, 1] == "Names")) {
+  if (any(dat[, 1] == "Names",na.rm = T)) {
     name.frame <- dat[which(dat[, 1] == "Names"):(which(dat[, 1] == "Names") + plate.sizes$rows[1]), 1:(plate.sizes$cols[1] + 1)] %>%
       purrr::set_names(.[1, ]) %>%
       dplyr::slice(-1) %>%
       tidyr::pivot_longer(cols = !Names, names_to = "cols", values_to = "names")
 
     name.frame <- do.call(rbind, replicate(length(labels), name.frame, simplify = FALSE)) %>%
-      rename(rows = Names) %>% distinct()
+      rename(rows = Names) %>%
+      distinct()
 
-    plates <- dplyr::left_join(plates,name.frame,by = c('rows','cols'))
+    plates <- suppressMessages(dplyr::left_join(plates, name.frame, by = c("rows", "cols")))
+  }else{
+    warning("No sample name data found in sheet.")
   }
 
   # add a name column if it exists
-  if (any(dat[, 1] == "pH_pairs")) {
-
+  if (any(dat[, 1] == "pH_pairs", na.rm = T)) {
     pairs <- dat[which(dat[, 1] == "pH_pairs"):nrow(dat), 1:3] %>%
       purrr::set_names(.[1, ]) %>%
       dplyr::slice(-1) %>%
@@ -80,9 +83,11 @@ tidyplate <- function(dat) {
     # assign well type based on 'pairs" data.frame
     plates[which(plates$rows %in% pairs$blanks), "type"] <- "blank"
     plates[which(plates$rows %in% pairs$dyes), "type"] <- "dye"
-
-  }else{pairs = "No pair data found in sheet."}
-  return(list(plates = plates,pairs = pairs))
+  } else {
+    pairs <- "No pair data found in sheet."
+    warning("No pH pair data (i.e. dye/blank) found in sheet.")
+  }
+  return(list(plates = plates, pairs = pairs))
 }
 
 #' Calculate pH values from m-cresol dye absorbance.
@@ -136,14 +141,20 @@ calc_pH_spec <- function(A730_blank, A578_blank, A434_blank, A730_dye, A578_dye,
 calc_plate <- function(tidyplate, verbose = TRUE,
                        pairs = data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H")),
                        salinity = 35, vol.dye.uL = 3, calibration = -0.00660453) {
-  # tidyplate <- tidyplate %>% subset(Mode == "Absorbance")
 
   # assign well type based on 'pairs" data.frame
   tidyplate[which(tidyplate$rows %in% pairs$blanks), "type"] <- "blank"
   tidyplate[which(tidyplate$rows %in% pairs$dyes), "type"] <- "dye"
 
+  # drop any (assumed) accidental Ft readings on dye filled wells
+  tidyplate <- tidyplate[!(tidyplate$type == "dye" & tidyplate$Mode == "Fluorescence Top Reading"),]
+
   # add a position column
   tidyplate$position <- tidyplate$cols
+
+  if (!all(tidyplate$rows %in% unlist(pairs))) {
+    warning("No cells measured not found in 'ph pairs' list.")
+  }
 
   out <- list()
   for (i in 1:nrow(pairs)) {
@@ -153,6 +164,7 @@ calc_plate <- function(tidyplate, verbose = TRUE,
   }
 
   tidyplate <- do.call(rbind, out)
+
 
   # if sample names exist, keep them, if not use only positions
   if (!suppressWarnings(is.null(tidyplate$names))) {
@@ -180,10 +192,19 @@ calc_plate <- function(tidyplate, verbose = TRUE,
     mutate(`Average Start Time` = mean(`Start Time`)) %>%
     select(-`Start Time`) %>%
     select(-c("rows", "cols")) %>%
-    tidyr::pivot_wider(names_from = Mode, values_from = value) %>%
-    select(c("Excitation Wavelength", "names", "type", "position", "Absorbance", "Fluorescence Top Reading", "Measurement Wavelength", "Average Start Time")) %>%
+    tidyr::pivot_wider(names_from = Mode, values_from = value)
+
+  if("Fluorescence Top Reading" %in% colnames(return)){
+    return <- return %>%
+    select(c("Excitation Wavelength", "names", "type", "position", "Absorbance",
+             "Fluorescence Top Reading", "Measurement Wavelength", "Average Start Time")) %>%
     tidyr::pivot_wider(names_from = `Excitation Wavelength`, values_from = `Fluorescence Top Reading`, names_prefix = "Ft_") %>%
     select(!contains("Ft_NA"))
+  }else{
+    return <- return %>%
+      select(c( "names", "type", "position", "Absorbance",
+               "Measurement Wavelength", "Average Start Time"))
+  }
 
   # reformat
   return <- return %>%
