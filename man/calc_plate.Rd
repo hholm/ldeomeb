@@ -8,8 +8,9 @@ calc_plate(
   tidyplate,
   verbose = TRUE,
   pairs = data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H")),
-  salinty = 35,
-  vol.dye.L = 0.01
+  salinity = 35,
+  vol.dye.uL = 3,
+  calibration = -0.00660453
 )
 }
 \value{

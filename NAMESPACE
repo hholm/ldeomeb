@@ -2,5 +2,6 @@
 
 export(calc_pH_spec)
 export(calc_plate)
+export(ft_convert)
 export(tidyplate)
 importFrom(magrittr,"%>%")

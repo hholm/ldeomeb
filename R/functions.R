@@ -78,7 +78,7 @@ tidyplate <- function(dat) {
     pairs <- dat[which(dat[, 1] == "pH_pairs"):nrow(dat), 1:3] %>%
       purrr::set_names(.[1, ]) %>%
       dplyr::slice(-1) %>%
-      select(-pH_pairs)
+      dplyr::select(-pH_pairs)
 
     # assign well type based on 'pairs" data.frame
     plates[which(plates$rows %in% pairs$blanks), "type"] <- "blank"
@@ -190,19 +190,19 @@ calc_plate <- function(tidyplate, verbose = TRUE,
 
   return <- return %>%
     mutate(`Average Start Time` = mean(`Start Time`)) %>%
-    select(-`Start Time`) %>%
-    select(-c("rows", "cols")) %>%
+    dplyr::select(-`Start Time`) %>%
+    dplyr::select(-c("rows", "cols")) %>%
     tidyr::pivot_wider(names_from = Mode, values_from = value)
 
   if("Fluorescence Top Reading" %in% colnames(return)){
     return <- return %>%
-    select(c("Excitation Wavelength", "names", "type", "position", "Absorbance",
+    dplyr::select(c("Excitation Wavelength", "names", "type", "position", "Absorbance",
              "Fluorescence Top Reading", "Measurement Wavelength", "Average Start Time")) %>%
     tidyr::pivot_wider(names_from = `Excitation Wavelength`, values_from = `Fluorescence Top Reading`, names_prefix = "Ft_") %>%
-    select(!contains("Ft_NA"))
+    dplyr::select(!contains("Ft_NA"))
   }else{
     return <- return %>%
-      select(c( "names", "type", "position", "Absorbance",
+      dplyr::select(c( "names", "type", "position", "Absorbance",
                "Measurement Wavelength", "Average Start Time"))
   }
 
@@ -215,7 +215,7 @@ calc_plate <- function(tidyplate, verbose = TRUE,
 
   return <- return %>%
     group_by(names, position, `Average Start Time`) %>%
-    select(!(contains("blank_NA") | contains("dye_NA"))) %>%
+    dplyr::select(!(contains("blank_NA") | contains("dye_NA"))) %>%
     summarise(across(everything(), function(x) {
       max(x, na.rm = T)
     }), .groups = "drop")
@@ -227,26 +227,26 @@ calc_plate <- function(tidyplate, verbose = TRUE,
   # get ft columns to pivot that are different accross 455 and 630
   #    return <- return %>%
   #    tidyr::pivot_wider(names_from = `Excitation Wavelength`, values_from = contains("Fluorescence Top Reading") | contains("Gain")  | contains("Z-Position")) %>%
-  #    select(!contains("_NA"))
+  #    dplyr::select(!contains("_NA"))
   #
   #    # cut and rejoin the ft and abs parts
   #    ft_part <- return %>% subset(!is.na(`Emission Wavelength`))
   #    abs_part <- return %>% subset(is.na(`Emission Wavelength`))#
 
-  #    ft_part <- ft_part %>% select(where(~ !all(is.na(.))))
-  #    abs_part <- abs_part %>% select(where(~ !all(is.na(.))))
+  #    ft_part <- ft_part %>% dplyr::select(where(~ !all(is.na(.))))
+  #    abs_part <- abs_part %>% dplyr::select(where(~ !all(is.na(.))))
 
   # Identify columns with identical values
   #    common_cols <- intersect(names(ft_part), names(abs_part)) |>
   #      keep(~ identical(ft_part[[.x]], abs_part[[.x]]))
 
   #    return <- abs_part |>
-  #        select(-all_of(common_cols[common_cols != 'names'])) %>%
+  #        dplyr::select(-all_of(common_cols[common_cols != 'names'])) %>%
   #        full_join(ft_part,by = join_by(names), suffix = c(" Abs", " Ft"))
   #  }
 
   pH <- return %>%
-    select(
+    dplyr::select(
       starts_with("blank_7"), starts_with("dye_7"), starts_with("blank_5"),
       starts_with("dye_5"), starts_with("blank_4"), starts_with("dye_4")
     ) %>%
@@ -254,12 +254,12 @@ calc_plate <- function(tidyplate, verbose = TRUE,
 
   # calculate pH
   pH <- calc_pH_spec(
-    A730_blank = pull(select(pH, starts_with("blank_7"))),
-    A578_blank = pull(select(pH, starts_with("blank_5"))),
-    A434_blank = pull(select(pH, starts_with("blank_4"))),
-    A730_dye = pull(select(pH, starts_with("dye_7"))),
-    A578_dye = pull(select(pH, starts_with("dye_5"))),
-    A434_dye = pull(select(pH, starts_with("dye_4"))),
+    A730_blank = pull(dplyr::select(pH, starts_with("blank_7"))),
+    A578_blank = pull(dplyr::select(pH, starts_with("blank_5"))),
+    A434_blank = pull(dplyr::select(pH, starts_with("blank_4"))),
+    A730_dye = pull(dplyr::select(pH, starts_with("dye_7"))),
+    A578_dye = pull(dplyr::select(pH, starts_with("dye_5"))),
+    A434_dye = pull(dplyr::select(pH, starts_with("dye_4"))),
     vol.dye.uL = vol.dye.uL,
     salinity = salinity,
     verbose = verbose,
@@ -281,5 +281,224 @@ calc_plate <- function(tidyplate, verbose = TRUE,
   return(return)
 }
 
+#' Convert fluorescence values between instruments or excitation colors
+#'
+#' Predicts equivalent fluorescence values across instruments or colour channels
+#' using pre-fitted linear models stored in \code{\link{ft_convert_df}}, or
+#' user-supplied model parameters. Prediction intervals are propagated via the
+#' delta method and can be back-transformed when working on a log10 scale.
+#'
+#' @param ft_value Numeric vector of fluorescence values to convert.
+#' @param strain Character. Phytoplankton strain values come from. Ignored when supplying manual model
+#'   parameters. #' Should be one of:
+#'   \itemize{
+#'     \item \code{"Syn7002"}
+#'     \item \code{"Syn8102"}
+#'     \item \code{"Ehux"}
+#'     \item \code{"Mcomm"}
+#'     \item \code{"Tpsu"}
+#'   }
+#' @param from Character. Name of the input fluorescence (e.g.
+#'   \code{"aqua_blue"}). Must be specified together with \code{to}. Should be one of:
+#'   \itemize{
+#'     \item \code{"aqua_red"}
+#'     \item \code{"plate_blue"}
+#'     \item \code{"plate_red"}
+#'     \item \code{"aqua_blue"}
+#'   }
+#' @param to Character. Name of the output fluorescence (e.g.
+#'   \code{"plate_blue"}). Must be specified together with \code{from}. Should be one of:
+#'   \itemize{
+#'     \item \code{"aqua_red"}
+#'     \item \code{"plate_blue"}
+#'     \item \code{"plate_red"}
+#'     \item \code{"aqua_blue"}
+#'   }
+#' @param intercept Numeric. Model intercept. Required when not using
+#'   \code{from}/\code{to} lookup.
+#' @param slope Numeric. Model slope. Required when not using
+#'   \code{from}/\code{to} lookup.
+#' @param estimate_error Logical. If \code{TRUE} (default), prediction intervals
+#'   are computed and returned as \code{lower} and \code{upper} columns. If
+#'   \code{FALSE}, only \code{predicted} is returned. Automatically set to
+#'   \code{FALSE} with a warning if any of \code{se_intercept}, \code{se_slope},
+#'   or \code{rse} are missing.
+#' @param se_intercept Numeric. Standard error of the intercept. Required when
+#'   not using \code{from}/\code{to} lookup.
+#' @param se_slope Numeric. Standard error of the slope. Required when not
+#'   using \code{from}/\code{to} lookup.
+#' @param rse Numeric. Residual standard error of the model. Required when not
+#'   using \code{from}/\code{to} lookup.
+#' @param level Numeric. Confidence level for the prediction interval.
+#'   Defaults to \code{0.95}.
+#' @param transform Character. Scale on which the model was fitted. One of
+#'   \code{"raw"} (default) or \code{"log10"}. When using \code{from}/\code{to}
+#'   lookup this selects the appropriate pre-fitted model; when using manual
+#'   parameters this controls back-transformation of predictions.
+#' @param direction Character. One of \code{"forward"} (default, predict
+#'   \code{to} from \code{from}) or \code{"backward"} (invert the model to
+#'   predict \code{from} from \code{to}). Set automatically when using
+#'   \code{from}/\code{to} lookup.
+#'
+#' @return A \code{\link[tibble]{tibble}} with one row per element of
+#'   \code{ft_value} and columns:
+#'   \describe{
+#'     \item{ft_value}{The original input values.}
+#'     \item{predicted}{The predicted equivalent fluorescence values.}
+#'     \item{lower}{Lower bound of the prediction interval. Only present when
+#'       \code{estimate_error = TRUE}.}
+#'     \item{upper}{Upper bound of the prediction interval. Only present when
+#'       \code{estimate_error = TRUE}.}
+#'   }
+#'
+#' @details
+#' The function can be used in two ways:
+#'
+#' \strong{Lookup mode}: supply \code{from}, \code{to}, and \code{strain} to
+#' automatically retrieve model parameters from \code{\link{ft_convert_df}}.
+#' The conversion direction is inferred from the variable order in the stored
+#' model.
+#'
+#' \strong{Manual mode}: supply all five model parameters (\code{intercept},
+#' \code{slope}, \code{se_intercept}, \code{se_slope}, \code{rse}) directly,
+#' along with \code{transform} and \code{direction}.
+#'
+#' Prediction intervals are computed using the delta method. On the log10
+#' scale, uncertainty is propagated in log-space and back-transformed, so
+#' intervals are asymmetric on the original scale.
+#'
+#' @examples
+#' # Lookup mode: convert aqua_blue to plate_blue for Ehux
+#' ft_convert(c(1000, 5000, 10000),
+#'            strain = "Ehux",
+#'            from   = "aqua_blue",
+#'            to     = "plate_blue",
+#'            transform = "log10")
+#'
+#' # Manual mode
+#' ft_convert(c(1000, 5000, 10000),
+#'            strain       = "Ehux",
+#'            intercept    = 0.2665854,
+#'            slope        = 1.035234,
+#'            se_intercept = 0.04975249,
+#'            se_slope     = 0.01626522,
+#'            rse          = 5.459139e-02,
+#'            transform    = "log10",
+#'            direction = "reverse")
+#'
+#' @seealso \code{\link{ft_convert_df}} for the underlying model parameters.
+#' @export
+ft_convert <- function(ft_value, strain, from = NULL, to = NULL,
+                       intercept = NULL, slope = NULL, estimate_error = TRUE,
+                       se_intercept = NULL, se_slope = NULL, rse = NULL,
+                       level = 0.95, transform = "raw", direction = "forward") {
+  transform <- match.arg(transform, c("raw", "log10"))
 
+  # --- Input validation ---
+  using_lookup <- !is.null(from) || !is.null(to)
+  using_manual <- !is.null(intercept) && !is.null(slope)
+
+  if (!using_lookup && !using_manual) {
+    stop("Provide either 'from'/'to' to use internal function values, or all model parameters manually.")
+  }
+
+  if (using_lookup) {
+    if (is.null(from) || is.null(to)) {
+      stop("Both 'from' and 'to' must be specified together.")
+    }
+    strain <- match.arg(strain, levels(ft_convert_df$species)) # throws informative error automatically
+    from <- match.arg(from, unique(c(ft_convert_df$x_var, ft_convert_df$y_var)))
+    to <- match.arg(to, unique(c(ft_convert_df$x_var, ft_convert_df$y_var)))
+
+    # pull model params from lookup table
+    params <- ft_convert_df %>%
+      filter(species == strain) %>%
+      filter(scale == transform) %>%
+      filter(y_var %in% c(from, to) & x_var %in% c(from, to))
+
+    if (nrow(params) != 1) {
+      stop("Expected 1 model but found ", nrow(params), " — have Henry check ft_convert_df for duplicate entries.")
+    }
+
+    intercept <- params$intercept
+    slope <- params$slope
+    se_intercept <- params$intercept.std.err
+    se_slope <- params$slope.std.err
+    rse <- params$rse
+
+    if (from == params$x_var) {
+      direction <- "forward"
+    } else if (from == params$y_var) {
+      direction <- "backward"
+    } else {
+      stop("'from' does not match either variable in the selected model.")
+    }
+  }
+
+  # --- Error estimation check ---
+  has_error_params <- !is.null(se_intercept) && !is.null(se_slope) && !is.null(rse)
+  if (estimate_error && !has_error_params) {
+    warning("estimate_error = TRUE but se_intercept, se_slope, and/or rse are missing. Switching to estimate_error = FALSE.")
+    estimate_error <- FALSE
+  }
+
+  t_val <- qt((1 + level) / 2, df = Inf)
+
+  if (transform == "log10") {
+    if (direction == "forward") {
+      log_x <- log10(ft_value)
+      log_pred <- intercept + slope * log_x
+      if (estimate_error) {
+        se_fit <- sqrt(se_intercept^2 + (log_x * se_slope)^2)
+        se_pred <- sqrt(rse^2 + se_fit^2)
+      }
+    } else {
+      # Invert: log_x = (log_y - intercept) / slope
+      log_y <- log10(ft_value)
+      log_pred <- (log_y - intercept) / slope
+      if (estimate_error) {
+        se_fit <- sqrt((se_intercept / slope)^2 + (log_pred * se_slope / slope)^2)
+        se_pred <- sqrt((rse / slope)^2 + se_fit^2)
+      }
+    }
+    if (estimate_error) {
+      tibble(
+        ft_value  = ft_value,
+        predicted = 10^log_pred,
+        lower     = 10^(log_pred - t_val * se_pred),
+        upper     = 10^(log_pred + t_val * se_pred)
+      )
+    } else {
+      tibble(
+        ft_value  = ft_value,
+        predicted = 10^log_pred
+      )
+    }
+  } else {
+    if (direction == "forward") {
+      predicted <- intercept + slope * ft_value
+      if (estimate_error) {
+        se_fit <- sqrt(se_intercept^2 + (ft_value * se_slope)^2)
+        se_pred <- sqrt(rse^2 + se_fit^2)
+      }
+    } else {
+      predicted <- (ft_value - intercept) / slope
+      if (estimate_error) {
+        se_fit <- sqrt((se_intercept / slope)^2 + (predicted * se_slope / slope)^2)
+        se_pred <- sqrt((rse / slope)^2 + se_fit^2)
+      }
+    }
+    if (estimate_error) {
+      tibble(ft_value, predicted,
+        lower = predicted - t_val * se_pred,
+        upper = predicted + t_val * se_pred
+      )
+    } else {
+      tibble(
+        ft_value,
+        predicted
+      )
+    }
+  }
+}
 

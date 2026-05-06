@@ -4,7 +4,7 @@
 \alias{tidyplate}
 \title{Import and format plate reader data from TECAN i-control.}
 \usage{
-tidyplate(loc)
+tidyplate(dat)
 }
 \arguments{
 \item{loc}{A \link{character} string containing the file location of raw plate reader data to import.}

@@ -11,9 +11,10 @@ calc_pH_spec(
   A730_dye,
   A578_dye,
   A434_dye,
-  vol.dye.L,
+  vol.dye.uL,
   salinity,
-  verbose = TRUE
+  verbose = TRUE,
+  calibration = calibration
 )
 }
 \value{
