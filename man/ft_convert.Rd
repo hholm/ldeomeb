@@ -11,6 +11,7 @@ ft_convert(
   to = NULL,
   intercept = NULL,
   slope = NULL,
+  estimate_error = TRUE,
   se_intercept = NULL,
   se_slope = NULL,
   rse = NULL,
@@ -56,6 +57,12 @@ parameters. #' Should be one of:
 \item{slope}{Numeric. Model slope. Required when not using
 \code{from}/\code{to} lookup.}
 
+\item{estimate_error}{Logical. If \code{TRUE} (default), prediction intervals
+are computed and returned as \code{lower} and \code{upper} columns. If
+\code{FALSE}, only \code{predicted} is returned. Automatically set to
+\code{FALSE} with a warning if any of \code{se_intercept}, \code{se_slope},
+or \code{rse} are missing.}
+
 \item{se_intercept}{Numeric. Standard error of the intercept. Required when
 not using \code{from}/\code{to} lookup.}
 
@@ -84,8 +91,10 @@ A \code{\link[tibble]{tibble}} with one row per element of
 \describe{
 \item{ft_value}{The original input values.}
 \item{predicted}{The predicted equivalent fluorescence values.}
-\item{lower}{Lower bound of the prediction interval.}
-\item{upper}{Upper bound of the prediction interval.}
+\item{lower}{Lower bound of the prediction interval. Only present when
+\code{estimate_error = TRUE}.}
+\item{upper}{Upper bound of the prediction interval. Only present when
+\code{estimate_error = TRUE}.}
 }
 }
 \description{
