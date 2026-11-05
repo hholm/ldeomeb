@@ -430,9 +430,11 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = NULL, salinity = 35, v
   blk <- unique(data.frame(well = plates$well, Label = plates$Label, t = st, stringsAsFactors = FALSE))
   avg_t <- do.call(c, lapply(seq_len(n), function(i) {
     b <- unique(blk[blk$well %in% c(sm$blank[i], sm$dye[i]), c("Label", "t")]); mean(b$t) }))
+  date = as.Date(avg_t)
   
-  out <- data.frame(names = sm$sample, position = sm$position, blank_well = sm$blank, dye_well = sm$dye,
-                    `Average Start Time` = avg_t, salinity = sal, check.names = FALSE, stringsAsFactors = FALSE)
+  out <- data.frame(names = sm$sample, position = sm$position, blank_well = sm$blank,
+                    dye_well = sm$dye, Date = date, `Average Start Time` = avg_t, salinity = sal,
+                    check.names = FALSE, stringsAsFactors = FALSE)
   
   # fluorescence: taken from the blank well
   fl <- grepl("fluoresc", mode) & !is.na(plates$wavelength) & plates$well %in% sm$blank
