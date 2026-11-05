@@ -67,13 +67,13 @@ NULL
   block_end <- c(label_rows[-1] - 1L, n)
   reserved <- c("rows", "cols", "well", "value", "Label", "Start Time", "Temperature")
   out <- list(); bad_all <- character(0)
-  
+
   for (i in seq_along(label_rows)) {
     r0 <- label_rows[i]; r1 <- block_end[i]
     lab <- trimws(sub("^label\\s*:\\s*", "", col1[r0], ignore.case = TRUE))
     r_start <- (r0:r1)[which(.tp_norm(col1[r0:r1]) == "starttime")[1]]
     if (is.na(r_start)) { warning("Block '", lab, "' has no 'Start Time:' line; skipped.", call. = FALSE); next }
-    
+
     # settings between the label and 'Start Time:' (key in col A, first filled cell to its right = value)
     srows <- if (r_start - r0 > 1) (r0 + 1):(r_start - 1) else integer(0)
     srows <- srows[!is.na(col1[srows])]
@@ -82,7 +82,7 @@ NULL
     keys <- col1[srows]; keys[keys %in% reserved] <- paste0("setting_", keys[keys %in% reserved])
     settings <- stats::setNames(as.list(vals), keys); settings <- settings[!duplicated(names(settings))]
     start_txt <- { v <- unlist(dat[r_start, -1], use.names = FALSE); v[!is.na(v)][1] }
-    
+
     # plate header row: "<>" or a 1..k run of integers
     after <- if (r_start < r1) (r_start + 1):r1 else integer(0)
     is_hdr <- vapply(after, function(r) {
@@ -95,7 +95,7 @@ NULL
     if (is.na(r_h)) { warning("Block '", lab, "': no plate grid found; skipped.", call. = FALSE); next }
     hv <- suppressWarnings(as.numeric(unlist(dat[r_h, -1], use.names = FALSE)))
     k <- sum(cumsum(is.na(hv)) == 0); colnums <- as.integer(hv[seq_len(k)])
-    
+
     # temperature line (between Start Time and the grid)
     temp <- NA_real_
     if (r_h - r_start > 1) {
@@ -103,7 +103,7 @@ NULL
       tc <- grep("^temperature\\s*:", cells, ignore.case = TRUE, value = TRUE)[1]
       if (!is.na(tc)) temp <- suppressWarnings(as.numeric(sub("^[^0-9-]*(-?[0-9.]+).*$", "\\1", tc)))
     }
-    
+
     # grid rows: consecutive rows whose col A is 1-2 letters
     rr <- r_h; data_rows <- integer(0)
     while (rr + 1 <= r1 && !is.na(col1[rr + 1]) && grepl("^[A-Za-z]{1,2}$", col1[rr + 1])) {
@@ -292,7 +292,7 @@ tidyplate <- function(dat, sheet = 1, samples = NULL) {
   d <- .tp_as_df(dat, sheet)
   plates <- .tp_parse_blocks(d)
   wells <- unique(plates$well)
-  
+
   # --- locate sample information ---
   tbl <- NULL; grid <- .tp_names_grid(d)
   if (isFALSE(samples)) {
@@ -317,7 +317,7 @@ tidyplate <- function(dat, sheet = 1, samples = NULL) {
   if (!is.null(tbl)) smp <- .tp_resolve_pairs(tbl, wells, name_lookup = grid, on_unmeasured = "warn")
   else if (!isFALSE(samples)) warning("No sample table (blank/dye wells) found. Add a 'Samples' sheet or table, ",
                                       "or pass `samples =` to calc_plate().", call. = FALSE)
-  
+
   plates$names <- NA_character_; plates$type <- NA_character_
   if (!is.null(smp)) {
     ib <- match(plates$well, smp$blank); id <- match(plates$well, smp$dye)
@@ -341,11 +341,12 @@ tidyplate <- function(dat, sheet = 1, samples = NULL) {
 #' @return A data.frame (`verbose = TRUE`) or numeric vector of pH values.
 #' @export
 calc_pH_spec <- function(A730_blank, A578_blank, A434_blank, A730_dye, A578_dye,
-                         A434_dye, vol.dye.uL = 3, salinity = 35, verbose = TRUE,
+                         A434_dye, vol.dye.uL = 3, salinity = 35, verbose = TRUE, temp_C = 25,
                          calibration = -0.00660453) {
+  temp_K = temp_C + 273.15
   # following hennon formula
   A1_A2 <- (A578_dye - A578_blank - (A730_dye - A730_blank)) / (A434_dye - A434_blank - (A730_dye - A730_blank))
-  pK2 <- (1245.9 / 298) + 3.8275 + (0.00211 * (35 - salinity))
+  pK2 <- (1245.9 / temp_K) + 3.8275 + (0.00211 * (35 - salinity))
   A1_A2_cor <- A1_A2 + (-1 * calibration * vol.dye.uL)
   pH <- pK2 + log10((A1_A2_cor - 0.00691) / (2.222 - A1_A2_cor * 0.1331))
   if (verbose) data.frame(A1_A2, pK2, A1_A2_cor, pH) else pH
@@ -391,13 +392,13 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = NULL, salinity = 35, v
     stop("No sample table (blank/dye wells). Add a 'Samples' sheet/table to the workbook or pass `samples =`.", call. = FALSE)
   } else sm <- .tp_resolve_pairs(.tp_pairs_from_df(sm), wells, NULL, "stop")
   n <- nrow(sm)
-  
+
   mode <- tolower(plates$Mode); mode[is.na(mode)] <- ""
   if (!"wavelength" %in% names(plates))
     plates$wavelength <- suppressWarnings(as.numeric(ifelse(grepl("absorb", mode), plates[["Measurement Wavelength"]], plates[["Excitation Wavelength"]])))
   if (!"Label" %in% names(plates)) plates$Label <- NA_character_
   st <- .tp_parse_time(plates[["Start Time"]])
-  
+
   # one value per well for a subset of reads
   well_values <- function(sel, what) {
     d <- plates[sel, ]
@@ -419,23 +420,35 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = NULL, salinity = 35, v
   }
   v434 <- get_abs(wavelengths[1]); v578 <- get_abs(wavelengths[2]); v730 <- get_abs(wavelengths[3])
   g <- function(v, w) unname(v[w])
-  
+
+  # Parse temperature across wells - take average of different wells in a set
+  used <- absn & !is.na(plates$wavelength) &
+    (abs(plates$wavelength - wavelengths[1]) <= wavelength_tol |
+       abs(plates$wavelength - wavelengths[2]) <= wavelength_tol |
+       abs(plates$wavelength - wavelengths[3]) <= wavelength_tol)
+  blk <- unique(data.frame(well = plates$well[used], Label = plates$Label[used],
+                           t = plates$Temperature[used], stringsAsFactors = FALSE))
+  avg_t <- vapply(seq_len(n), function(i) {
+    b <- unique(blk[blk$well %in% c(sm$blank[i], sm$dye[i]), c("Label", "t")])
+    if (all(is.na(b$t))) NA_real_ else mean(b$t, na.rm = TRUE)
+  }, numeric(1))
+
   sal <- sm$salinity; sal[is.na(sal)] <- salinity
   ph <- suppressWarnings(calc_pH_spec(
     A730_blank = g(v730, sm$blank), A578_blank = g(v578, sm$blank), A434_blank = g(v434, sm$blank),
-    A730_dye = g(v730, sm$dye), A578_dye = g(v578, sm$dye), A434_dye = g(v434, sm$dye),
+    A730_dye = g(v730, sm$dye), A578_dye = g(v578, sm$dye), A434_dye = g(v434, sm$dye),temp_C = avg_t,
     vol.dye.uL = vol.dye.uL, salinity = sal, verbose = TRUE, calibration = calibration))
-  
+
   # per-sample mean start time of the reads covering its wells
   blk <- unique(data.frame(well = plates$well, Label = plates$Label, t = st, stringsAsFactors = FALSE))
-  avg_t <- do.call(c, lapply(seq_len(n), function(i) {
+  avg_time <- do.call(c, lapply(seq_len(n), function(i) {
     b <- unique(blk[blk$well %in% c(sm$blank[i], sm$dye[i]), c("Label", "t")]); mean(b$t) }))
   date = as.Date(avg_t)
-  
-  out <- data.frame(names = sm$sample, position = sm$position, blank_well = sm$blank,
-                    dye_well = sm$dye, Date = date, `Average Start Time` = avg_t, salinity = sal,
+
+  out <- data.frame(names = sm$sample, position = sm$position, blank_well = sm$blank, Temperature = avg_t,
+                    dye_well = sm$dye, Date = date, `Average Start Time` = avg_time, salinity = sal,
                     check.names = FALSE, stringsAsFactors = FALSE)
-  
+
   # fluorescence: taken from the blank well
   fl <- grepl("fluoresc", mode) & !is.na(plates$wavelength) & plates$well %in% sm$blank
   for (wl in sort(unique(plates$wavelength[fl]))) {
@@ -448,7 +461,7 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = NULL, salinity = 35, v
     out[[paste0("blank_", nm)]] <- g(v, sm$blank); out[[paste0("dye_", nm)]] <- g(v, sm$dye)
   }
   out <- cbind(out, ph)
-  
+
   # sanity flags
   chk <- list(
     "missing/non-numeric absorbance" = !stats::complete.cases(out[, c("blank_730", "dye_730", "blank_578", "dye_578", "blank_434", "dye_434")]),
@@ -459,7 +472,7 @@ calc_plate <- function(tidyplate, verbose = TRUE, pairs = NULL, salinity = 35, v
   if (any(nzchar(out$flag)))
     warning(sum(nzchar(out$flag)), " of ", n, " samples flagged (see `flag` column): ",
             paste(utils::head(out$names[nzchar(out$flag)], 6), collapse = ", "), call. = FALSE)
-  
+
   if (!verbose) return(out[, c("names", "position", "pH")])
   rownames(out) <- NULL
   out
@@ -577,15 +590,15 @@ ft_convert <- function(ft_value, strain, from = NULL, to = NULL,
                        se_intercept = NULL, se_slope = NULL, rse = NULL,
                        level = 0.95, transform = "raw", direction = "forward") {
   transform <- match.arg(transform, c("raw", "log10"))
-  
+
   # --- Input validation ---
   using_lookup <- !is.null(from) || !is.null(to)
   using_manual <- !is.null(intercept) && !is.null(slope)
-  
+
   if (!using_lookup && !using_manual) {
     stop("Provide either 'from'/'to' to use internal function values, or all model parameters manually.")
   }
-  
+
   if (using_lookup) {
     if (is.null(from) || is.null(to)) {
       stop("Both 'from' and 'to' must be specified together.")
@@ -593,23 +606,23 @@ ft_convert <- function(ft_value, strain, from = NULL, to = NULL,
     strain <- match.arg(strain, levels(ft_convert_df$species)) # throws informative error automatically
     from <- match.arg(from, unique(c(ft_convert_df$x_var, ft_convert_df$y_var)))
     to <- match.arg(to, unique(c(ft_convert_df$x_var, ft_convert_df$y_var)))
-    
+
     # pull model params from lookup table
     params <- ft_convert_df %>%
       dplyr::filter(species == strain) %>%
       dplyr::filter(scale == transform) %>%
       dplyr::filter(y_var %in% c(from, to) & x_var %in% c(from, to))
-    
+
     if (nrow(params) != 1) {
       stop("Expected 1 model but found ", nrow(params), " — have Henry check ft_convert_df for duplicate entries.")
     }
-    
+
     intercept <- params$intercept
     slope <- params$slope
     se_intercept <- params$intercept.std.err
     se_slope <- params$slope.std.err
     rse <- params$rse
-    
+
     if (from == params$x_var) {
       direction <- "forward"
     } else if (from == params$y_var) {
@@ -618,16 +631,16 @@ ft_convert <- function(ft_value, strain, from = NULL, to = NULL,
       stop("'from' does not match either variable in the selected model.")
     }
   }
-  
+
   # --- Error estimation check ---
   has_error_params <- !is.null(se_intercept) && !is.null(se_slope) && !is.null(rse)
   if (estimate_error && !has_error_params) {
     warning("estimate_error = TRUE but se_intercept, se_slope, and/or rse are missing. Switching to estimate_error = FALSE.")
     estimate_error <- FALSE
   }
-  
+
   t_val <- qt((1 + level) / 2, df = Inf)
-  
+
   if (transform == "log10") {
     if (direction == "forward") {
       log_x <- log10(ft_value)
@@ -745,30 +758,30 @@ ft_convert <- function(ft_value, strain, from = NULL, to = NULL,
 #'
 #' @export
 average_turner <- function(wd = NA) {
-  
+
   # Option 2: Let the user choose the directory if files are not in the current working directory
   if(is.na(wd)){
     wd <- choose.dir(default = getwd(), caption = "Select folder with CSV files.")
   }
   # List all CSV files in the directory (skip files that don't match pattern)
   csv_files <- list.files(wd, pattern = "\\.csv$", full.names = TRUE)
-  
+
   # Drop any csv output by this script
   csv_files <- csv_files[!grepl(csv_files, pattern = "/file_means_")]
-  
+
   cat("Summarizing ", length(csv_files), " files.\n")
-  
+
   # Initialize an empty list to store the data from each CSV
   csv <- list()
-  
+
   # Read each CSV file, skipping the first 3 rows
   for (file in csv_files) {
     csv[[file]] <- read.csv(file, skip = 3, colClasses = c("character", "character", "numeric", "NULL"))
   }
-  
+
   # Initialize an empty dataframe to store the summary output
   out <- data.frame()
-  
+
   # Loop through each CSV file and calculate summary statistics
   for (file in seq_along(csv)) {
     out <- rbind(
@@ -783,13 +796,13 @@ average_turner <- function(wd = NA) {
       )
     )
   }
-  
+
   # Define the output file name with timestamp
   output_file <- paste0(wd, "/file_means_", format(Sys.time(), "%Y%m%d%H%M%S"), ".csv")
-  
+
   # Write the output to a CSV file
   write.csv(out, file = output_file, row.names = FALSE)
-  
+
   # Notify the user that the script has completed
   cat("Summary of fluormeter readings written to:", output_file, "\n")
   out
