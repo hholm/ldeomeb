@@ -4,14 +4,32 @@
 \alias{tidyplate}
 \title{Import and format plate reader data from TECAN i-control.}
 \usage{
-tidyplate(dat)
+tidyplate(dat, sheet = 1, samples = NULL)
 }
 \arguments{
-\item{loc}{A \link{character} string containing the file location of raw plate reader data to import.}
+\item{dat}{A path to an .xlsx/.xls/.csv TECAN export, or an already imported
+data.frame/tibble (read with \code{col_names = FALSE}).}
+
+\item{sheet}{Sheet of the workbook holding the plate data (name or number). Default 1.}
+
+\item{samples}{\code{NULL} (auto-detect, default), a data.frame or file path with the sample table,
+or \code{FALSE} to skip sample handling.}
 }
 \value{
-A \link{data.frame} containing imported and formatted data.
+A list with \code{plates} (long data.frame: \code{rows}, \code{cols}, \code{well}, \code{value}, \code{Label},
+reader settings, \verb{Start Time}, \code{Temperature}, \code{wavelength}, \code{names}, \code{type}),
+\code{samples} (the sample table) and \code{pairs} (same as \code{samples}, kept for backwards compatibility).
 }
 \description{
-This function returns a data.frame containing formatted data from a from TECAN i-control csv output.
+Reads a TECAN i-control export and returns every plate read in long format, plus the
+blank/dye sample table. The raw sheet can be left untouched: sample information may be
+(in order of precedence) passed via \code{samples}, placed on a second sheet called
+"Samples", or typed at the bottom of the data sheet.
+}
+\details{
+The sample table has one row per sample and the columns \code{sample}, \code{blank}, \code{dye} and
+(optionally) \code{salinity}; \code{blank} and \code{dye} are well IDs such as \code{A1} / \code{B1}. Any well can be
+a blank or a dye. Column names are matched loosely (case, spaces and plural are ignored) and
+well IDs may be written \code{a1}, \code{A01}, \verb{A 1}. The older layout (a "Names" plate grid plus a
+"pH_pairs" table of whole-row letters) is still understood.
 }

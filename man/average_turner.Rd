@@ -4,7 +4,7 @@
 \alias{average_turner}
 \title{Summarize Fluorometer CSV Files by Mean and Standard Deviation}
 \usage{
-average_turner()
+average_turner(wd = NA)
 }
 \value{
 Invisibly returns \code{NULL}. A CSV file is written to the selected directory
@@ -30,7 +30,7 @@ fluorometer datapoints. The function outputs a single CSV file containing
 per-file means, standard deviations, and timestamps.
 }
 \details{
-This function assumes each CSV file:
+This is set up to expect data output by the Turner Fluorometer software. This function assumes each CSV file:
 \itemize{
 \item Contains at least 10 rows of data after skipping the first 3 lines.
 \item Has columns named \code{Date}, \code{Time}, and \code{Datapoint.Value}.

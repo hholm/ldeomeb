@@ -11,28 +11,28 @@ calc_pH_spec(
   A730_dye,
   A578_dye,
   A434_dye,
-  vol.dye.uL,
-  salinity,
+  vol.dye.uL = 3,
+  salinity = 35,
   verbose = TRUE,
-  calibration = calibration
+  calibration = -0.00660453
 )
 }
+\arguments{
+\item{A730_blank, A578_blank, A434_blank}{Absorbance of the sample without dye at 730, 578, 434 nm.}
+
+\item{A730_dye, A578_dye, A434_dye}{Absorbance of the sample with m-cresol dye at 730, 578, 434 nm.}
+
+\item{vol.dye.uL}{Volume of dye added, in microlitres (default 3).}
+
+\item{salinity}{Sample salinity in PSU; a single value or one per sample (default 35).}
+
+\item{verbose}{Return a data.frame with intermediate values (\code{TRUE}) or only the pH vector (\code{FALSE}).}
+
+\item{calibration}{Dye-addition correction, per microlitre of dye (default -0.00660453).}
+}
 \value{
-A \link{data.frame} containing calculated pH values with metadata, or a \link{vector} containing just pH values if verbose == FALSE.
+A data.frame (\code{verbose = TRUE}) or numeric vector of pH values.
 }
 \description{
-This function returns a data.frame containing calculated pH values.
-}
-\details{
-\itemize{
-\item A730_blank A \link{vector} or \link{numeric} of samples absorbance at 730nm with no dye.
-\item A578_blank A \link{vector} or \link{numeric} of samples absorbance at 578nm with no dye.
-\item A434_blank A \link{vector} or \link{numeric} of samples absorbance at 434nm with no dye.
-\item A730_dye A \link{vector} or \link{numeric} of samples absorbance at 730nm with m-cresol dye.
-\item A578_dye A \link{vector} or \link{numeric} of samples absorbance at 578nm with m-cresol dye.
-\item A434_dye A \link{vector} or \link{numeric} of samples absorbance at 434nm with m-cresol dye.
-\item vol.dye.L Volumn of dye added in liters (defaults to 0.01).
-\item salinity Sample salinity in PSU (defaults to 35).
-\item verbose Should only the pH values (False) be returned or metadata as well (True)?
-}
+Calculate pH values from m-cresol dye absorbance.
 }

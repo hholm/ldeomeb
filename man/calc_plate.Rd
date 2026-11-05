@@ -7,24 +7,42 @@
 calc_plate(
   tidyplate,
   verbose = TRUE,
-  pairs = data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H")),
+  pairs = NULL,
   salinity = 35,
   vol.dye.uL = 3,
-  calibration = -0.00660453
+  calibration = -0.00660453,
+  samples = NULL,
+  wavelengths = c(434, 578, 730),
+  wavelength_tol = 5,
+  duplicates = c("error", "mean")
 )
 }
+\arguments{
+\item{tidyplate}{The list returned by \code{\link[=tidyplate]{tidyplate()}} (preferred) or its \verb{$plates} data.frame.}
+
+\item{verbose}{\code{TRUE} for all intermediate columns, \code{FALSE} for name, position and pH only.}
+
+\item{pairs, samples}{Optional sample table overriding the one found by \code{\link[=tidyplate]{tidyplate()}}
+(\code{pairs} is the old argument name). There is no default layout any more: the wells come
+from the sample table.}
+
+\item{salinity}{Default salinity in PSU, used where the sample table has no \code{salinity} value.}
+
+\item{vol.dye.uL}{Volume of dye added in microlitres (default 3).}
+
+\item{calibration}{Dye-addition correction per microlitre (default -0.00660453).}
+
+\item{wavelengths}{Wavelengths (nm) of the three absorbance reads, in the order 434, 578, 730.}
+
+\item{wavelength_tol}{Tolerance in nm when matching reads to \code{wavelengths} (default 5).}
+
+\item{duplicates}{What to do if a well was read twice at one wavelength: \code{"error"} (default) or \code{"mean"}.}
+}
 \value{
-A \link{data.frame} containing calculated pH values with metadata.
+A data.frame with one row per sample. Check the \code{flag} column for suspicious samples.
 }
 \description{
-This function returns a data.frame containing calculated pH values and metadata.
-}
-\details{
-\itemize{
-\item tidyplate A \link{data.frame} containing formatted absorbance created using \code{\link[=tidyplate]{tidyplate()}}.
-\item pairs A \link{data.frame} containing paired 'blank' and 'dye' rows. Defaults too: \link{data.frame(blanks = c("A", "C", "E", "G"), dyes = c("B", "D", "F", "H"))}
-\item vol.dye.L Volumn of dye added in liters (defaults to 0.01).
-\item salinity Sample salinity in PSU (defaults to 35).
-\item verbose Should only the pH values (False) be returned or metadata as well (True)?
-}
+Pairs each sample's blank and dye wells (from the sample table), picks the 434/578/730 nm
+absorbance reads by wavelength, and returns one row per sample. Fluorescence reads
+(\verb{Ft_<excitation>}) are taken from the blank well.
 }
